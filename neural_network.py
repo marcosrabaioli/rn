@@ -1,7 +1,8 @@
 from random import random, randrange
-from random import seed
 from math import exp
 from csv import reader
+import csv
+import pickle
 
 # Initialize a network
 # n_inputs: numero de entradas
@@ -11,6 +12,8 @@ def initialize_network(n_inputs, n_hidden, n_outputs):
     network = list()
     hidden_layer = [{'weights': [random() for i in range(n_inputs + 1)]} for i in range(n_hidden)]
     network.append(hidden_layer)
+    ocult_layer = [{'weights': [random() for i in range(n_hidden + 1)]} for i in range(n_hidden)]
+    network.append(ocult_layer)
     output_layer = [{'weights': [random() for i in range(n_hidden + 1)]} for i in range(n_outputs)]
     network.append(output_layer)
     return network
@@ -187,25 +190,71 @@ def cross_validation_split(dataset, n_folds):
         dataset_split.append(fold)
     return dataset_split
 
-dataset = load_csv('clound.csv')
+def select_dataset_train(dataset, n_folds):
+    dataset_copy = list(dataset)
+    fold_size = int(len(dataset) / n_folds)
+
+    fold = list()
+    while len(fold) < fold_size/2:
+        index = randrange(len(dataset_copy))
+        if dataset_copy[index][-1] == 1:
+            fold.append(dataset_copy.pop(index))
+
+    while len(fold) < fold_size:
+        index = randrange(len(dataset_copy))
+        if dataset_copy[index][-1] == 0:
+            fold.append(dataset_copy.pop(index))
+
+    return fold
+
+
+dataset = load_csv('CIOS_20.csv')
 dataset = normalize_dataset(dataset)
-dataset_split = cross_validation_split(dataset, 5)
-
+#dataset_train = select_dataset_train(dataset, 25)
+dataset_split = cross_validation_split(dataset, 3)
 dataset_train = dataset_split[0]
-
-
 
 n_inputs = len(dataset_train[0])-1
 n_outputs = len(set([row[-1] for row in dataset]))
-network = initialize_network(n_inputs, 10, n_outputs)
+network = initialize_network(n_inputs, 7, n_outputs)
 
-train_network(network, dataset_train, 0.1, 1000, n_outputs)
+
+train_network(network, dataset, 0.1, 5000, n_outputs)
+
+with open('network.pickle', 'wb') as f:
+    pickle.dump(network, f)
 
 ok = 0
+pp = 0
+nd = 0
+fp = 0
+nn = 0
+cios_reais = 0
+
+csvfile = open('resultado_rn.csv', 'w')
+spamwriter = csv.writer(csvfile, delimiter='\t', quoting=csv.QUOTE_MINIMAL)
+
 for row in dataset:
     prediction = predict(network, row)
     if row[-1] == prediction:
         ok += 1
 
-print('Mean Accuracy: ', (ok/len(dataset))*100)
+    if row[-1]==1 and prediction==1:
+        pp +=1
+    elif row[-1] == 1 and prediction == 0:
+        nd+=1
+    elif row[-1] == 0 and prediction == 1:
+        fp +=1
+    elif row[-1] == 0 and prediction == 0:
+        nn +=1
 
+    if row[-1]==1:
+        cios_reais +=1
+    row.append(prediction)
+    spamwriter.writerow(row)
+
+print('Media geral: ', (ok/len(dataset))*100)
+print('Cios detectados: ', (pp/cios_reais)*100)
+print('Cios nao detectados: ', ((nd)/cios_reais)*100)
+print('Falsos positivos: ', (fp/(pp+fp))*100)
+print('Negativos: ', (nn/(len(dataset)-cios_reais))*100)
