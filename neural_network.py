@@ -4,39 +4,96 @@ from csv import reader
 import csv
 import pickle
 
-# Initialize a network
-# n_inputs: numero de entradas
-# n_hidden: numero de neuronios da camada escondida
-# n_outputs: numero de neuronios da camada de saida (relacionado com o numero de classes a classificar)
-def initialize_network(n_inputs, n_hidden, n_outputs):
+
+def initialize_network(n_inputs, design, n_outputs):
+    """ Inicializa a rede neural.
+    
+        Inicializa os pesos sinapticos de cada neuronio de cada camada. A tecnica de inicializacao eh utilizar um valor 
+        aleatorio entre 0 e 1.
+        A arquiteura da rede eh definida pelas variaveis design e n_output.
+        Ex:
+        
+        >>> n_inputs = 10
+        >>> design = [8,5]
+        >>> n_outputs = 2
+        >>> network = initialize_network(n_inputs,design,n_outputs)
+        >>> print(network)
+        
+        Resultara em uma arquitetura 8:5:2, ou seja, uma rede com uma camada de entrada (possuindo 8 neuronios), uma 
+        camada escondida (possuindo 5 neuronios) e e uma camada de saida (possuindo 2 neuronios).
+            
+        @param n_inputs: numero de entradas da rede neural.
+        @type n_inputs: int
+        @param design: lista que contem a quantidade de neuronios das camadas de entrada e escondidas.
+        @type design: [int,int,...]
+        @param n_outputs: numero de saidas da rede neural.
+        @type n_outputs: int
+        @return: Retorna a rede neural com suas camadas, neuronios e respectivos pesos sinapticos.
+        @rtype: [[{"wheigths":[float,...]}],...]
+    """
+
     network = list()
-    hidden_layer = [{'weights': [random() for i in range(n_inputs + 1)]} for i in range(n_hidden)]
-    network.append(hidden_layer)
-    ocult_layer = [{'weights': [random() for i in range(n_hidden + 1)]} for i in range(n_hidden)]
-    network.append(ocult_layer)
-    output_layer = [{'weights': [random() for i in range(n_hidden + 1)]} for i in range(n_outputs)]
+    input_layer = [{'weights': [random() for i in range(n_inputs + 1)]} for i in range(design[0])]
+    network.append(input_layer)
+
+    for layer in range(1, len(design)):
+        hiden_layer = [{'weights': [random() for i in range(design[layer-1] + 1)]} for i in range(design[layer])]
+        network.append(hiden_layer)
+
+    output_layer = [{'weights': [random() for i in range(design[-1] + 1)]} for i in range(n_outputs)]
     network.append(output_layer)
     return network
 
 
-# Calculate neuron activation for an input
-# weigths: pesos do neuronio
-# inputs: entradas do neuronio
 def activate(weights, inputs):
+    """ Calcula a ativacao do neuronio.
+    
+        Calcula o somatorio das entradas multiplicadas pelos respectivos pesos do neuronio, o que eh chamado de ativacao 
+        do neuronio.
+    
+        @param weights: Pesos do neuronio
+        @type weights: [float,...]
+        @param inputs: Entradas do neuronio
+        @type inputs: [float,...]
+        @return: Retorna o valor da ativacao do neuronio
+        @rtype: float
+    """
+
     activation = weights[-1]*1 # Soma o bias
     for i in range(len(weights)-1):
         activation += weights[i] * inputs[i] # Soma peso*entrada
     return activation
 
-# Transfer neuron activation
-# activation: valor de ativação do neuronio
+
 def transfer(activation):
+    """ Calcula o valor da funcao de transferencia da ativacao do neuronio.
+    
+        A funcao de transferencia eh definida como:
+        f(a) =      1
+               ------------
+                1 + e^(-a)
+                
+        onde:
+            a = ativacao do neuronio
+    
+    @param activation: Ativacao do neuronio 
+    @type activation: float
+    @return: Retorna o valor da funcao de transferencia da ativacao do neuronio
+    """
     return 1.0 / (1.0 + exp(-activation))
 
-# Forward propagate input to a network output
-# network: rede neural
-# row: entrada da rede
+
 def forward_propagate(network, row):
+    """ Propagacao das entradas da rede para a saida da rede.
+        
+        Executa a propagacao das entradas da rede ate a saida da rede.    
+        @param network: Rede neural
+        @type network: network
+        @param row: Entradas da rede neural
+        @type row: [float,...]
+        @return: Retorna a saida dos neuronios de saida da rede
+        @rtype: [float,...]
+    """
     inputs = row
     for layer in network:
         new_inputs = []
@@ -47,15 +104,36 @@ def forward_propagate(network, row):
         inputs = new_inputs
     return inputs
 
-# Calculate the derivative of an neuron output
-# output: saida do neuronio
+
 def transfer_derivative(output):
+    """ Calcula a derivada da saida do neuronio.
+    
+        A derivada da funcao logistica eh definida como:
+        f(x) =   1
+              -------
+               1 - x
+        onde:
+            x = saida do neuronio
+    
+        @param output: Saida do neuronio
+        @type output: float
+        @return: Retorna a derivada da saida do neuronio
+        @rtype: float
+    """
     return output * (1.0 - output)
 
-# Backpropagate error and store in neurons
-# network: rede
-# expected: valor de saida esperado
+
 def backward_propagate_error(network, expected):
+    """ Backpropagation do erro.
+    
+        Faz a propagacao do erro da saida para a entrada da rede.
+    
+        @param network: Rede neural
+        @type network: network
+        @param expected: Valor esperado na saida da rede
+        @type expected: float
+    """
+
     for i in reversed(range(len(network))):
         layer = network[i]
         errors = list()
@@ -74,15 +152,23 @@ def backward_propagate_error(network, expected):
                 neuron = layer[j]
                 errors.append(expected[j] - neuron['output'])
 
+        # Calcula erro*derivada da saida para todos neuronios
         for j in range(len(layer)):
             neuron = layer[j]
             neuron['delta'] = errors[j] * transfer_derivative(neuron['output'])
 
-# Update network weights with error
-# network: rede
-# row: amostra de treinamento
-# l_rate: taxa de aprendizado
+
 def update_weights(network, row, l_rate):
+    """ Atualiza os pesos dos neuronios a partir do erro.
+        
+        @param network: Rede neural
+        @type network: network
+        @param row: Amostra de treinamento
+        @type row: [float,...]
+        @param l_rate: Taxa de aprendizado
+        @type l_rate: float
+    """
+
     for i in range(len(network)):
         # Inicializa vetor de entrada com as entradas da rede
         inputs = row[:-1]
@@ -94,8 +180,21 @@ def update_weights(network, row, l_rate):
                 neuron['weights'][j] += l_rate * neuron['delta'] * inputs[j]
             neuron['weights'][-1] += l_rate * neuron['delta']*1 # bias
 
-# Train a network for a fixed number of epochs
 def train_network(network, train, l_rate, n_epoch, n_outputs):
+    """ Treina a rede neural utilizando um numero fixo de epocas.
+    
+        @param network: Rede neural
+        @type network: network
+        @param train: Amostra de treinamento
+        @type train: [[float,...],...]
+        @param l_rate: Taxa de aprendixado
+        @type l_rate: float
+        @param n_epoch: Numero de epocas
+        @type n_epoch: int
+        @param n_outputs: Numero de classes de saida
+        @type n_outputs: int
+    """
+
     for epoch in range(n_epoch):
         sum_error = 0
         for row in train:
@@ -105,49 +204,33 @@ def train_network(network, train, l_rate, n_epoch, n_outputs):
             sum_error += sum([(expected[i]-outputs[i])**2 for i in range(len(expected))])
             backward_propagate_error(network, expected)
             update_weights(network, row, l_rate)
-        #print('>epoch=%d, lrate=%.3f, error=%.3f' % (epoch, l_rate, sum_error))
+        print('>epoch=%d, lrate=%.3f, error=%.3f' % (epoch, l_rate, sum_error))
 
 
 # Make a prediction with a network
 def predict(network, row):
+    """ Calcula a predicao da rede neural.
+    
+        @param network: Rede neural
+        @type network: network
+        @param row: Amostra de entrada
+        @type row: [float,...]
+        @return: Retorna a predicao da rede, indice de qual neuronio foi mais ativado
+        @type: int
+    """
+
     outputs = forward_propagate(network, row)
     return outputs.index(max(outputs))
 
 
-
-# seed(1)
-#
-#
-#
-#
-#
-# # Conjunto de dados para treinar a rede
-# dataset = [[2.7810836,2.550537003,0],
-#            [1.465489372,2.362125076,0],
-#            [3.396561688,4.400293529,0],
-#            [1.38807019,1.850220317,0],
-#            [3.06407232,3.005305973,0],
-#            [7.627531214,2.759262235,1],
-#            [5.332441248,2.088626775,1],
-#            [6.922596716,1.77106367,1],
-#            [8.675418651,-0.242068655,1],
-#            [7.673756466,3.508563011,1]]
-# # calcula tamanho da entrada
-# n_inputs = len(dataset[0]) - 1
-# # calcula quantas classes de saida existem
-# n_outputs = len(set([row[-1] for row in dataset]))
-# # Inicializa a rede
-# network = initialize_network(n_inputs, 2, n_outputs)
-# # treina a rede
-# train_network(network, dataset, 0.5, 20, n_outputs)
-# for layer in network:
-#     print(layer)
-#
-# for row in dataset:
-#     prediction = predict(network, row)
-#     print('Expected=%d, Got=%d' % (row[-1], prediction))
-
 def load_csv(filename):
+    """ Carrega dataset em csv.
+    
+        @param filename: Caminho de destino do arquivo csv
+        @type filename: string
+        @return: Retorna uma lista com os dados do dataset
+        @rtype: [[float,...],...]
+    """
 
     dataset = []
     file = open(filename, 'r')
@@ -161,11 +244,25 @@ def load_csv(filename):
 
 
 def dataset_minmax(dataset):
+    """ Identifica maior e menor valor para cada coluna do dataset.
+    
+        @param dataset: Conjunto de dados
+        @type dataset: [[float,...],...]
+        @return: Retorna uma lista com os valores maximos e minimos de cada coluna
+        @rtype: [[float,float],...]
+    """
 
     minmax = [[min(col), max(col)] for col in zip(*dataset)]
     return minmax
 
 def normalize_dataset(dataset):
+    """ Normaliza o conjunto de dados.
+    
+        @param dataset: Conjunto de dados 
+        @type dataset: [[float,...],...]
+        @return: Retorna o conjunto de dados normalizado
+        @rtype: [[float,...],...]
+    """
 
     minmax = dataset_minmax(dataset)
     dataset_normalize = []
@@ -177,8 +274,18 @@ def normalize_dataset(dataset):
 
     return dataset_normalize
 
-# Split a dataset into k folds
 def cross_validation_split(dataset, n_folds):
+    """ Separa o conjunto de dados em grupos.
+    
+        A ideia eh separar o conjunto de dados em partes iguais para realizar o treinamento, teste e validacao do sistema.
+    
+        @param dataset: Conjunto de dados 
+        @type dataset: [[float,...],...]
+        @param n_folds: Numero de grupos para separacao
+        @type n_folds: int
+        @return: Retorna uma lista com n_folds posicoes contendo os grupos de conjutos de dados
+    """
+
     dataset_split = list()
     dataset_copy = list(dataset)
     fold_size = int(len(dataset) / n_folds)
@@ -191,6 +298,14 @@ def cross_validation_split(dataset, n_folds):
     return dataset_split
 
 def select_dataset_train(dataset, n_folds):
+    """ Separa o conjunto de dados em grupos contendo a mesma quantidade de cada classe de saida.
+    
+        @param dataset: Conjunto de dados 
+        @type dataset: [[float,...],...]
+        @param n_folds: Numero de grupos para separacao
+        @type n_folds: int
+        @return: Retorna uma lista com n_folds posicoes contendo os grupos de conjutos de dados
+    """
     dataset_copy = list(dataset)
     fold_size = int(len(dataset) / n_folds)
 
@@ -208,18 +323,18 @@ def select_dataset_train(dataset, n_folds):
     return fold
 
 
-dataset = load_csv('CIOS_20.csv')
+dataset = load_csv('arquivos_de_treino/20/10vars/CIOS_20.csv')
 dataset = normalize_dataset(dataset)
-#dataset_train = select_dataset_train(dataset, 25)
+
 dataset_split = cross_validation_split(dataset, 3)
 dataset_train = dataset_split[0]
 
 n_inputs = len(dataset_train[0])-1
 n_outputs = len(set([row[-1] for row in dataset]))
-network = initialize_network(n_inputs, 7, n_outputs)
+network = initialize_network(n_inputs, [9], n_outputs)
 
 
-train_network(network, dataset, 0.1, 5000, n_outputs)
+train_network(network, dataset, 0.05, 2000, n_outputs)
 
 with open('network.pickle', 'wb') as f:
     pickle.dump(network, f)
